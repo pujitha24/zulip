@@ -36,6 +36,12 @@ type IconData = {
       }
 );
 
+export type NarrowServerTerm = {
+    operator: string;
+    operand: string | number | number[];
+    negated?: boolean | undefined;
+};
+
 type Part =
     | {
           type: "plain_text";
@@ -2122,15 +2128,20 @@ export class Filter {
     }
 
     get_stringified_narrow_for_server_query(): string {
-        const terms = this.terms_for_server_query().map((term) => {
+        const terms: NarrowServerTerm[] = [];
+        for (const term of this.terms_for_server_query()) {
             if (term.operator === "channel") {
-                return {
-                    ...term,
-                    operand: Number.parseInt(term.operand, 10),
-                };
+                terms.push({...term, operand: Number.parseInt(term.operand, 10)});
+            } else if (term.operator === "dm-including") {
+                // The server expects a single user ID per `dm-including`
+                // term, so expand a multi-user operand into several terms.
+                for (const user_id of term.operand) {
+                    terms.push({...term, operand: user_id});
+                }
+            } else {
+                terms.push(term);
             }
-            return term;
-        });
+        }
 
         return JSON.stringify(terms);
     }

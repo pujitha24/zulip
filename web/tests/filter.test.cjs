@@ -3532,3 +3532,12 @@ run_test("get_stringified_narrow_for_server_query", () => {
         '[{"operator":"channel","operand":1,"negated":false},{"operator":"topic","operand":"bar","negated":false}]',
     );
 });
+
+run_test("get_stringified_narrow_for_server_query dm-including", () => {
+    // The server expects one integer user ID per `dm-including` term.
+    const filter = new Filter([{operator: "dm-including", operand: [joe.user_id, 7]}]);
+    assert.equal(
+        filter.get_stringified_narrow_for_server_query(),
+        `[{"operator":"dm-including","operand":${joe.user_id},"negated":false},{"operator":"dm-including","operand":7,"negated":false}]`,
+    );
+});

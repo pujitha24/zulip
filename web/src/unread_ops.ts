@@ -13,6 +13,7 @@ import * as desktop_notifications from "./desktop_notifications.ts";
 import * as dialog_widget from "./dialog_widget.ts";
 import * as feedback_widget from "./feedback_widget.ts";
 import {Filter} from "./filter.ts";
+import type {NarrowServerTerm} from "./filter.ts";
 import {$t, $t_html} from "./i18n.ts";
 import * as message_flags from "./message_flags.ts";
 import * as message_lists from "./message_lists.ts";
@@ -197,15 +198,20 @@ function bulk_update_read_flags_for_narrow(
     } = {},
     caller_modal_id?: string,
 ): void {
-    const terms_with_integer_channel_id = narrow.map((term) => {
+    const terms_for_request: NarrowServerTerm[] = [];
+    for (const term of narrow) {
         if (term.operator === "channel") {
-            return {
-                ...term,
-                operand: Number.parseInt(term.operand, 10),
-            };
+            terms_for_request.push({...term, operand: Number.parseInt(term.operand, 10)});
+        } else if (term.operator === "dm-including") {
+            // The server expects a single user ID per `dm-including`
+            // term, so expand a multi-user operand into several terms.
+            for (const user_id of term.operand) {
+                terms_for_request.push({...term, operand: user_id});
+            }
+        } else {
+            terms_for_request.push(term);
         }
-        return term;
-    });
+    }
     const request = {
         anchor,
         // anchor="oldest" is an anchor ID lower than any valid
@@ -217,7 +223,7 @@ function bulk_update_read_flags_for_narrow(
         num_after,
         op,
         flag: "read",
-        narrow: JSON.stringify(terms_with_integer_channel_id),
+        narrow: JSON.stringify(terms_for_request),
     };
     void channel.post({
         url: "/json/messages/flags/narrow",
